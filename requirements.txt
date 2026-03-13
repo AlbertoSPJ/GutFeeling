@@ -1,0 +1,28 @@
+# Core
+streamlit==1.41.0
+python-dotenv==1.0.0
+
+# LlamaIndex
+llama-index==0.14.15
+llama-index-core==0.14.15
+llama-index-llms-groq==0.4.1
+llama-index-embeddings-huggingface==0.6.1
+
+# Embeddings & LLM
+sentence-transformers==2.7.0
+transformers==4.57.6
+torch==2.10.0
+huggingface_hub==0.36.2
+tokenizers==0.22.2
+
+# Data
+pandas==2.3.3
+numpy==2.3.5
+
+# Visualization
+matplotlib==3.10.6
+seaborn==0.13.2
+networkx==3.0
+
+# Analysis
+biopython==1.86

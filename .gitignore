@@ -1,0 +1,16 @@
+# API keys — never upload credentials
+.env
+
+# Vector index and embedding cache — regenerated automatically on first run
+vector_index_minilm/
+embed_minilm/
+
+# Python cache — generated automatically
+__pycache__/
+*.py[cod]
+*.pyo
+.ipynb_checkpoints/
+
+# Operating system
+.DS_Store
+Thumbs.db
