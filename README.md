@@ -6,7 +6,7 @@ A RAG (Retrieval-Augmented Generation) chatbot that answers questions about gut 
 
 ## 🌿 Live Demo
 
-> Coming soon — Streamlit Community Cloud deployment in progress.
+👉 **[Launch GutFeeling](https://albertospj-gutfeeling.hf.space)**
 
 ---
 
