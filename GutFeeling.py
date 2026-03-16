@@ -434,7 +434,8 @@ def init_llm():
 @st.cache_resource
 def load_or_create_index(embedding_name: str):
     """
-    Load a pre-built vector index from disk, or build it from scratch if not found.
+    Load a pre-built vector index from disk, or download it from Hugging Face Hub
+    if not found locally (e.g. on Streamlit Cloud deployment).
 
     Building the index involves:
     1. Reading all 55,990 PubMed abstracts from the JSONL corpus.
@@ -444,6 +445,7 @@ def load_or_create_index(embedding_name: str):
     4. Storing the resulting FAISS index to disk for reuse on subsequent runs.
 
     On subsequent runs, the index is loaded directly from disk (~seconds vs ~hours).
+    On Streamlit Cloud, the index is downloaded from Hugging Face Hub on first run.
     """
     llm = init_llm()
     embed_model = HuggingFaceEmbedding(
@@ -459,25 +461,36 @@ def load_or_create_index(embedding_name: str):
     persist_dir = PERSIST_DIRS[embedding_name]
 
     if not os.path.exists(persist_dir):
-        # First run: build index from corpus
-        documents = []
-        with open(JSONL_PATH, "r", encoding="utf-8") as f:
-            for line in f:
-                article = json.loads(line)
-                # Metadata is stored alongside each chunk for citation retrieval
-                doc_metadata = {
-                    "pmid":    article["metadata"].get("pmid", "N/A"),
-                    "journal": article["metadata"].get("journal", "Unknown"),
-                    "year":    article["metadata"].get("year", "N/A")
-                }
-                documents.append(Document(text=article["content"], metadata=doc_metadata))
+        # Check if index is available on Hugging Face Hub (Streamlit Cloud deployment)
+        hf_token = os.getenv("HF_TOKEN_READ")
+        if hf_token:
+            from huggingface_hub import snapshot_download
+            with st.spinner("Downloading index from Hugging Face Hub..."):
+                snapshot_download(
+                    repo_id="AlbertoSPJ/gutfeeling-index",
+                    repo_type="dataset",
+                    local_dir=persist_dir,
+                    token=hf_token
+                )
+        else:
+            # Local fallback: build index from corpus
+            documents = []
+            with open(JSONL_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    article = json.loads(line)
+                    doc_metadata = {
+                        "pmid":    article["metadata"].get("pmid", "N/A"),
+                        "journal": article["metadata"].get("journal", "Unknown"),
+                        "year":    article["metadata"].get("year", "N/A")
+                    }
+                    documents.append(Document(text=article["content"], metadata=doc_metadata))
 
-        vector_index = VectorStoreIndex.from_documents(documents, show_progress=True)
-        vector_index.storage_context.persist(persist_dir=persist_dir)
-    else:
-        # Subsequent runs: load from disk
-        storage_context = StorageContext.from_defaults(persist_dir=persist_dir)
-        vector_index = load_index_from_storage(storage_context)
+            vector_index = VectorStoreIndex.from_documents(documents, show_progress=True)
+            vector_index.storage_context.persist(persist_dir=persist_dir)
+
+    # Load index from disk (whether just downloaded or already present)
+    storage_context = StorageContext.from_defaults(persist_dir=persist_dir)
+    vector_index = load_index_from_storage(storage_context)
 
     return vector_index
 
