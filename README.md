@@ -86,14 +86,14 @@ python 02_prepare_rag_jsonl.py
 streamlit run GutFeeling.py
 ```
 
-The vector index will be built automatically on first run (~5 minutes).
+The vector index will be downloaded automatically on first run if `HF_TOKEN` is configured, or built from scratch (build time varies depending on hardware) otherwise.
 
 ---
 
 ## 📊 Data
 
 - **Source:** PubMed / NCBI Entrez API
-- **Query:** "gut microbiota" OR "gut microbiome"
+- **Query:** microbiome, microbiota, gut flora, gut microbiota, intestinal flora — combined with health/disease context filters, restricted to human studies in English
 - **Coverage:** 55,990 articles · 1980–2025
 - **Fields:** title, abstract, authors, journal, year, MeSH terms
 
