@@ -8,7 +8,8 @@ Architecture overview:
 - The question is embedded using a HuggingFace sentence-transformer model (all-MiniLM-L6-v2).
 - The embedding is used to retrieve the 5 most semantically similar PubMed abstracts
   from a pre-built vector index (LlamaIndex / FAISS).
-- The retrieved abstracts + the question are passed to Llama 3.3 70B (via Groq API),
+- The retrieved abstracts + the question are passed to a Groq-hosted LLM
+  (configurable via MODEL_NAME in .env; currently openai/gpt-oss-120b),
   which generates a grounded, citation-backed answer.
 - The app also includes a Literature Landscape tab with exploratory visualizations
   of the full PubMed corpus.
@@ -407,7 +408,16 @@ EMBED_CACHE_DIRS = {
     "mpnet":  "./embed_mpnet"
 }
 
-MODEL_NAME = "llama-3.3-70b-versatile"  # Groq-hosted Llama 3.3 70B
+# Groq-hosted LLM model name. Read from .env (MODEL_NAME) so that future Groq
+# deprecations (llama-3.3-70b-versatile was retired on 2026-08-16) only require
+# changing an environment variable, not a code edit + redeploy.
+# Current default: openai/gpt-oss-120b (Groq's recommended production replacement).
+MODEL_NAME = os.getenv("MODEL_NAME", "openai/gpt-oss-120b")
+
+# Reasoning effort for gpt-oss models (low/medium/high). Set explicitly rather
+# than relying on the model default, since higher effort increases latency and
+# token usage per chat turn — "low" favors responsiveness for a conversational UI.
+REASONING_EFFORT = os.getenv("REASONING_EFFORT", "low")
 
 EMBED_MODELS = {
     "minilm": "sentence-transformers/all-MiniLM-L6-v2",   # Chosen model: fast, lightweight, strong on biomedical text
@@ -424,10 +434,20 @@ EMBED_MODELS = {
 
 @st.cache_resource
 def init_llm():
-    """Initialize the Groq LLM client. Cached to avoid redundant API connections."""
+    """
+    Initialize the Groq LLM client. Cached to avoid redundant API connections.
+
+    reasoning_effort is passed explicitly for gpt-oss models: without it, the
+    model falls back to its own default effort level, which can add noticeable
+    latency to each chat turn. "low"/"medium" keep the chatbot responsive;
+    reasoning_format is NOT set here because Groq does not support that
+    parameter for gpt-oss models — reasoning content is returned in a separate
+    "reasoning" field by default, outside response.response.
+    """
     return Groq(
         model=MODEL_NAME,
-        api_key=os.getenv("GROQ_API_KEY")
+        api_key=os.getenv("GROQ_API_KEY"),
+        reasoning_effort=REASONING_EFFORT
     )
 
 
@@ -507,19 +527,14 @@ CONSUMER_PROMPT = [
     ChatMessage(
         role=MessageRole.SYSTEM,
         content=(
-            "You are a friendly and approachable health assistant specialized in gut microbiota research. "
-            "Your audience is the general public — curious individuals or people who have received the results "
-            "of a commercial microbiota analysis and want to understand what they mean for their health. "
-            "The field covers gut microbiota, gut microbiome, intestinal flora, probiotics, prebiotics, "
-            "and related microbiological and clinical research. "
-            "Always explain concepts in simple, clear, non-technical language. Avoid jargon; when technical "
-            "terms are unavoidable, explain them briefly. "
+            "You are a friendly and approachable health assistant specialized in gut microbiota. "
+            "Your audience is the general public — people who may have received a commercial microbiota analysis "
+            "and want to understand what it means for their health. "
+            "Always explain concepts in simple, clear, non-technical language. Avoid jargon. "
             "Answer ONLY based on the provided scientific context. "
-            "Give practical, actionable insights when possible (e.g. dietary changes, lifestyle habits). "
-            "If the context only partially answers the question, summarize what is found and clearly state "
-            "what is not covered — do not speculate beyond the evidence. "
-            "Only say 'I cannot find this information' if the context is completely unrelated to the question. "
-            "Never fabricate studies, statistics, or recommendations not present in the retrieved context."
+            "Give practical, actionable advice when possible (e.g. dietary changes, lifestyle habits). "
+            "If the context only partially answers the question, summarize what is found and indicate what is not covered. "
+            "Only say 'I cannot find this information' if the context is completely unrelated to the question."
         )
     )
 ]
@@ -528,21 +543,13 @@ SCIENTIST_PROMPT = [
     ChatMessage(
         role=MessageRole.SYSTEM,
         content=(
-            "You are a rigorous biomedical research assistant specialized in microbiota science. "
-            "Your audience is researchers and scientists who want to map the current state of the literature — "
-            "to identify relevant references, understand research trends, and generate new ideas for their work. "
-            "The field covers gut microbiota, gut microbiome, intestinal flora, probiotics, prebiotics, "
-            "and related microbiological and clinical research. "
+            "You are a strict biomedical research assistant specialized in microbiota science. "
+            "Your audience is professional scientists and researchers. "
             "Use precise scientific terminology. Reference methodologies, study designs, and findings accurately. "
             "Answer ONLY based on the provided scientific context. "
-            "Prioritize depth and scientific precision. Structure your answers to help the researcher "
-            "understand what has been studied, how, and what gaps remain — making it easy to identify "
-            "promising references and unexplored directions. "
-            "If the context only partially answers the question, summarize what is found, clearly identify "
-            "the gaps, and suggest what type of evidence or study design would be needed to fill them. "
-            "Only say 'I cannot find this information in the documents' if the context is completely unrelated "
-            "to the question. "
-            "Never fabricate citations, statistics, or conclusions not present in the retrieved context."
+            "If the context only partially answers the question, summarize what is found and clearly indicate the gaps. "
+            "Only say 'I cannot find this information in the documents' if the context is completely unrelated to the question. "
+            "Keep answers concise and scientifically rigorous."
         )
     )
 ]

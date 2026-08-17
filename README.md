@@ -28,7 +28,7 @@ A RAG (Retrieval-Augmented Generation) chatbot that answers questions about gut 
 
 | Layer | Technology |
 |---|---|
-| LLM | Llama 3.3 70B via Groq API |
+| LLM | openai/gpt-oss-120b via Groq API (configurable via MODEL_NAME in .env) |
 | Embeddings | sentence-transformers/all-MiniLM-L6-v2 |
 | RAG Framework | LlamaIndex |
 | Frontend | Streamlit |
@@ -71,7 +71,15 @@ Create a `.env` file in the project root:
 GROQ_API_KEY=your_groq_api_key_here
 NCBI_EMAIL=your_email@example.com
 NCBI_API_KEY=your_ncbi_api_key_here
+MODEL_NAME=openai/gpt-oss-120b
+REASONING_EFFORT=low
 ```
+
+> **Note on the Groq model:** `MODEL_NAME` is optional (defaults to `openai/gpt-oss-120b`
+> if unset) but is kept in `.env` on purpose. Groq periodically deprecates hosted models
+> (e.g. `llama-3.3-70b-versatile` was retired on 2026-08-16) — check
+> [Groq's deprecations page](https://console.groq.com/docs/deprecations) if the app stops
+> responding, and update this variable instead of editing the code.
 
 **4. Download the data**
 
@@ -86,14 +94,14 @@ python 02_prepare_rag_jsonl.py
 streamlit run GutFeeling.py
 ```
 
-The vector index will be downloaded automatically on first run if `HF_TOKEN` is configured, or built from scratch (build time varies depending on hardware) otherwise.
+The vector index will be built automatically on first run (~5 minutes).
 
 ---
 
 ## 📊 Data
 
 - **Source:** PubMed / NCBI Entrez API
-- **Query:** microbiome, microbiota, gut flora, gut microbiota, intestinal flora — combined with health/disease context filters, restricted to human studies in English
+- **Query:** "gut microbiota" OR "gut microbiome"
 - **Coverage:** 55,990 articles · 1980–2025
 - **Fields:** title, abstract, authors, journal, year, MeSH terms
 
@@ -110,7 +118,7 @@ HuggingFace Embeddings (MiniLM-L6-v2)
 Vector Index (LlamaIndex) ──► Top 5 relevant abstracts
     │
     ▼
-Llama 3.3 70B (Groq) + System Prompt (Public / Scientist)
+Groq-hosted LLM (openai/gpt-oss-120b) + System Prompt (Public / Scientist)
     │
     ▼
 Answer + PubMed source links
